@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "wechat-cli"
-version = "1.0.0"
+version = "1.0.1"
 description = "Free local CLI for querying WeChat data and exporting your own Moments"
 requires-python = ">=3.10"
 license = "Apache-2.0"
@@ -35,6 +35,7 @@ wechat-cli = "wechat_cli.main:cli"
 
 [tool.setuptools.packages.find]
 where = ["."]
+include = ["wechat_cli*"]
 
 [tool.setuptools.package-data]
 wechat_cli = ["bin/*"]
