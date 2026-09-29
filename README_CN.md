@@ -2,7 +2,9 @@
 
 一个免费、在本机运行的微信数据命令行工具。
 
-> **本地发行候选版 0.3.0rc3。**公开源码仓库：[Puss-M/wechat-cli](https://github.com/Puss-M/wechat-cli)。候选版尚未发布到 PyPI 或 npm；npm 当前可安装的版本是 0.2.4，不包含朋友圈命令。
+> **v1.0.0。**公开源码仓库：[Puss-M/wechat-cli](https://github.com/Puss-M/wechat-cli)。当前提供源码 ZIP 和 wheel，暂未发布到 PyPI 或 npm。
+
+v1 增加可选的微信桌面界面采集：它不会上传数据，会在本地滚动已打开的微信窗口，保存每页截图和能从辅助功能树读取的文字/链接，再与本地缓存去重合并。微信没有暴露给辅助功能树的图片、地点或卡片字段，会保留在截图中，不会被伪造为结构化字段。
 
 ## 导出自己的朋友圈
 
@@ -34,6 +36,21 @@ wechat-cli moments --format json --output .\my-moments.json
 wechat-cli moments --format markdown --output .\my-moments.md
 ~~~
 
+补齐未缓存历史（先在微信中打开“我 → 朋友圈”并保持窗口可见）：
+
+~~~powershell
+python -m pip install pywinauto pyautogui
+wechat-cli moments --ui-collect --ui-confirm-own --ui-max-pages 300 --format json --output .\my-moments-v1.json
+~~~
+
+如果还没有初始化本地数据库，可直接使用独立的 UI 采集命令：
+
+~~~powershell
+wechat-cli moments-ui --confirm-own --max-pages 300 --output .\my-moments-ui.json
+~~~
+
+采集过程会在输出目录旁生成 `moments-ui/ui_screenshots/` 和 `ui_capture_manifest.json`。如果微信窗口标题不匹配，可使用 `--ui-window-title` 指定正则。中断后从微信页面当前位置重新运行，并加 `--resume` 合并已有 JSON；它受微信版本、窗口可访问性和本地缓存/界面能看到的历史范围限制。
+
 命令会扫描朋友圈缓存中的所有候选记录，再按 XML 作者筛选当前账号，因此数据库行使用旧账号别名时也不会漏掉自己的帖子。损坏、重复或归属不明的单条记录默认跳过，并在 JSON 的 `diagnostics` 和 Markdown 的“导出诊断”中列出；需要审计数据完整性时可加 `--strict`，让首个异常直接停止。
 
 为避免覆盖文件，输出文件已存在时命令会停止。再次导出前请更换文件名或自行移走旧文件。
@@ -63,7 +80,7 @@ wechat-cli moments --decode-images --auto-image-key --image-limit 1 --image-outp
 
 ### 其他命令
 
-候选版也保留原有的聊天记录、联系人、收藏和统计命令。运行 wechat-cli --help 可查看命令列表。本候选版新增的验证主要针对朋友圈命令。
+v1 也保留原有的聊天记录、联系人、收藏和统计命令。运行 `wechat-cli --help` 可查看命令列表。
 
 ## 隐私与使用
 

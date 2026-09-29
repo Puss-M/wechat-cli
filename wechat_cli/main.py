@@ -4,7 +4,7 @@ import click
 
 from .core.context import AppContext
 
-_VERSION = "0.3.0rc3"
+_VERSION = "1.0.0"
 
 
 class _LazyAppContext:
@@ -64,6 +64,7 @@ from .commands.history import history
 from .commands.init import init
 from .commands.members import members
 from .commands.moments import moments
+from .commands.moments_ui import moments_ui
 from .commands.new_messages import new_messages
 from .commands.search import search
 from .commands.sessions import sessions
@@ -82,6 +83,7 @@ cli.add_command(stats)
 cli.add_command(unread)
 cli.add_command(favorites)
 cli.add_command(moments)
+cli.add_command(moments_ui)
 
 
 if __name__ == "__main__":

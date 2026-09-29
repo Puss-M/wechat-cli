@@ -346,4 +346,9 @@ def render_markdown(moments, skipped_empty, diagnostics=None):
                 if image.get("download_error"):
                     lines.append(f"  下载失败：{image['download_error']}")
             lines.append("")
+        if moment.get("capture_screenshot"):
+            lines.extend([f"界面截图证据：{moment['capture_screenshot']}", ""])
+        for capture in moment.get("ui_captures", []):
+            if capture.get("screenshot"):
+                lines.extend([f"界面截图证据：{capture['screenshot']}", ""])
     return "\n".join(lines).rstrip() + "\n"

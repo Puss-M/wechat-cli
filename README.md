@@ -2,7 +2,9 @@
 
 A free, local command-line tool for your own WeChat data.
 
-> **Local release candidate 0.3.0rc3.** The public source repository is [Puss-M/wechat-cli](https://github.com/Puss-M/wechat-cli). This candidate has not been published to PyPI or npm. The npm release currently available is 0.2.4 and does not contain the Moments command.
+> **v1.0.0.** The public source repository is [Puss-M/wechat-cli](https://github.com/Puss-M/wechat-cli). Source ZIP and wheel downloads are provided; PyPI and npm publication are not included yet.
+
+The v1 workflow adds an optional WeChat desktop UI capture path. It runs locally, scrolls an already-open WeChat window, saves page screenshots and text/links exposed by the accessibility tree, then merges them with the local cache. Images, locations, or cards that WeChat does not expose to accessibility are preserved in screenshots instead of being invented as structured fields.
 
 ## Moments export
 
@@ -33,6 +35,21 @@ Before the first data export, start WeChat for Windows and run `wechat-cli init`
 wechat-cli moments --format json --output .\my-moments.json
 wechat-cli moments --format markdown --output .\my-moments.md
 ~~~
+
+To backfill history not present in the local cache, open **Me -> Moments** in WeChat and keep the window visible:
+
+~~~powershell
+python -m pip install pywinauto pyautogui
+wechat-cli moments --ui-collect --ui-confirm-own --ui-max-pages 300 --format json --output .\my-moments-v1.json
+~~~
+
+If the local database has not been initialized yet, use the standalone UI collector:
+
+~~~powershell
+wechat-cli moments-ui --confirm-own --max-pages 300 --output .\my-moments-ui.json
+~~~
+
+The collector writes `moments-ui/ui_screenshots/` and `ui_capture_manifest.json` next to the output directory. Use `--ui-window-title` if the window title differs. After an interruption, reopen the Moments page at the desired position and add `--resume` to merge into the existing JSON; coverage still depends on the WeChat build, accessibility labels, and history visible to the desktop client.
 
 The command scans all cached timeline candidates and then filters by the XML author, so rows stored with a legacy account alias are not silently missed. Corrupt, duplicate, or ambiguous rows are skipped by default and listed in JSON `diagnostics` or the Markdown export diagnosis. Add `--strict` when auditing data integrity and require the first anomaly to stop the export.
 

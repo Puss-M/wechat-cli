@@ -3,6 +3,7 @@
 import json
 import os
 import sqlite3
+import tempfile
 from pathlib import Path
 
 import click
@@ -23,6 +24,7 @@ from ..core.moments import (
     load_own_moments,
     render_markdown,
 )
+from ..core.ui_moments import UiCaptureError, collect_visible_moments, merge_moment_records
 
 
 @click.command("moments")
@@ -46,33 +48,87 @@ from ..core.moments import (
               help="最多解码多少个缓存文件；0 表示全部")
 @click.option("--download-limit", type=click.IntRange(min=0), default=0, show_default=True,
               help="最多下载多少张自己的朋友圈图片；0 表示全部")
+@click.option("--ui-collect", is_flag=True,
+              help="连接已打开的微信窗口滚动采集未缓存的朋友圈；保存本地截图，不上传数据")
+@click.option("--ui-confirm-own", is_flag=True,
+              help="确认当前微信窗口已打开‘我 -> 朋友圈’；UI 采集必须显式确认")
+@click.option("--resume", is_flag=True,
+              help="UI 采集时读取已有 JSON 并合并；不与普通覆盖模式混用")
+@click.option("--ui-max-pages", type=click.IntRange(min=1), default=100, show_default=True,
+              help="UI 采集最多滚动页数")
+@click.option("--ui-pause", type=click.FloatRange(min=0), default=1.2, show_default=True,
+              help="UI 每页等待秒数")
+@click.option("--ui-window-title", default="微信|WeChat|Weixin", show_default=True,
+              help="UI 采集目标窗口标题正则")
 @click.pass_context
 def moments(ctx, fmt, output_path, include_empty, strict, decode_images, download_images,
             image_key_file, auto_image_key, xor_key, image_output, image_limit,
-            download_limit):
+            download_limit, ui_collect, ui_confirm_own, resume, ui_max_pages, ui_pause, ui_window_title):
     """导出当前账号在本机缓存中的朋友圈内容和元数据。"""
     app = ctx.obj
-    self_username = get_self_username(app.db_dir, app.cache, app.decrypted_dir)
-    if not self_username:
-        raise click.ClickException("无法确认当前微信账号 ID，已停止导出")
-
-    db_path = app.cache.get(os.path.join("sns", "sns.db"))
-    if not db_path:
-        raise click.ClickException("无法访问 sns/sns.db；请检查本机缓存和 wechat-cli 初始化状态")
-
+    records, skipped_empty, diagnostics = [], 0, {
+        "candidate_count": 0,
+        "matched_author_count": 0,
+        "exported_count": 0,
+        "skipped_empty": 0,
+        "skipped_invalid": 0,
+        "skipped_records": [],
+    }
+    local_error = None
     try:
-        records, skipped_empty, diagnostics = load_own_moments(
-            db_path,
-            self_username,
-            include_empty,
-            strict=strict,
-            return_diagnostics=True,
-        )
-    except (MomentDataError, sqlite3.Error) as exc:
-        raise click.ClickException(str(exc)) from exc
+        self_username = get_self_username(app.db_dir, app.cache, app.decrypted_dir)
+        db_path = app.cache.get(os.path.join("sns", "sns.db"))
+        if self_username and db_path:
+            records, skipped_empty, diagnostics = load_own_moments(
+                db_path,
+                self_username,
+                include_empty,
+                strict=strict,
+                return_diagnostics=True,
+            )
+        else:
+            local_error = "未找到本地朋友圈缓存"
+    except (MomentDataError, sqlite3.Error, FileNotFoundError, OSError) as exc:
+        if not ui_collect:
+            raise click.ClickException(str(exc)) from exc
+        local_error = str(exc)
 
-    if output_path and os.path.exists(output_path):
+    if ui_collect and not ui_confirm_own:
+        raise click.ClickException("UI 采集必须同时传入 --ui-confirm-own，确认当前页面是‘我 -> 朋友圈’")
+    if resume and not ui_collect:
+        raise click.ClickException("--resume 只能和 --ui-collect 一起使用")
+    if output_path and os.path.exists(output_path) and not resume:
         raise click.ClickException(f"输出文件已存在，未覆盖: {output_path}")
+    if resume and output_path:
+        try:
+            previous = json.loads(Path(output_path).read_text(encoding="utf-8"))
+            records = merge_moment_records(previous.get("moments", []), records)
+            diagnostics["resumed_from"] = str(Path(output_path).resolve())
+        except (OSError, json.JSONDecodeError, AttributeError) as exc:
+            raise click.ClickException(f"无法读取要续采集的 JSON: {exc}") from exc
+    if local_error:
+        diagnostics["local_cache"] = {"status": "unavailable", "reason": local_error}
+
+    ui_stats = None
+    if ui_collect:
+        try:
+            try:
+                cfg = getattr(app, "cfg", None) or load_config()
+                default_root = Path(cfg["decoded_image_dir"]).resolve().parent / "moments-ui"
+            except (FileNotFoundError, KeyError, OSError):
+                default_root = Path.cwd() / "moments-ui"
+            capture_root = Path(output_path).resolve().parent if output_path else default_root
+            ui_records, ui_stats = collect_visible_moments(
+                capture_root,
+                max_pages=ui_max_pages,
+                pause=ui_pause,
+                title_pattern=ui_window_title,
+            )
+            records = merge_moment_records(records, ui_records)
+            diagnostics["ui_capture"] = ui_stats
+            diagnostics["exported_count"] = len(records)
+        except (UiCaptureError, OSError, KeyError) as exc:
+            raise click.ClickException(f"微信界面采集失败，未覆盖已有缓存结果: {exc}") from exc
 
     download_stats = None
     if download_images:
@@ -90,7 +146,7 @@ def moments(ctx, fmt, output_path, include_empty, strict, decode_images, downloa
     else:
         content = json.dumps({
             "source": "local_sns_cache",
-            "scope": "cached_only",
+            "scope": "local_cache_plus_ui" if ui_collect else "cached_only",
             "count": len(records),
             "skipped_empty": skipped_empty,
             "diagnostics": diagnostics,
@@ -99,16 +155,36 @@ def moments(ctx, fmt, output_path, include_empty, strict, decode_images, downloa
 
     if output_path:
         try:
-            with open(output_path, "x", encoding="utf-8") as handle:
-                handle.write(content)
+            if resume:
+                output_parent = Path(output_path).resolve().parent
+                with tempfile.NamedTemporaryFile(
+                    "w", encoding="utf-8", newline="\n", dir=output_parent,
+                    prefix=f".{Path(output_path).name}.", suffix=".tmp", delete=False,
+                ) as handle:
+                    temporary_output = Path(handle.name)
+                    handle.write(content)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                os.replace(temporary_output, output_path)
+            else:
+                with open(output_path, "x", encoding="utf-8") as handle:
+                    handle.write(content)
         except OSError as exc:
+            if "temporary_output" in locals():
+                temporary_output.unlink(missing_ok=True)
             raise click.ClickException(f"无法写入输出文件: {exc}") from exc
         click.echo(
             f"已导出 {len(records)} 条到: {output_path}（跳过无内容 {skipped_empty} 条，"
             f"跳过异常 {diagnostics['skipped_invalid']} 条）",
             err=True,
         )
-    else:
+    if ui_stats:
+        click.echo(
+            f"微信界面采集完成：扫描 {ui_stats['pages']} 页，补充/合并 {ui_stats['records']} 条；"
+            f"清单: {ui_stats['manifest']}",
+            err=True,
+        )
+    elif not output_path:
         click.echo(content, nl=False)
 
     if download_stats:
