@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+
+# PyInstaller
+*.spec
+
+# npm platform binaries (published to npm, not git)
+npm/platforms/*/bin/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# IDE and OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Generated exports and private WeChat data
+outputs/
+wechat-backup/
+backup/
+reports/
+work/
+*.db
+*.db-wal
+*.db-shm
+*.json
+*.key
+*.pem
+*.p12
+*.pfx
+.env
+.env.*
+
+# Temp files
+*.tmp
+*.bak
