@@ -2,7 +2,7 @@
 
 A free, local command-line tool for your own WeChat data.
 
-> **Local release candidate 0.3.0rc2.** The public source repository is [Puss-M/wechat-cli](https://github.com/Puss-M/wechat-cli). This candidate has not been published to PyPI or npm. The npm release currently available is 0.2.4 and does not contain the Moments command.
+> **Local release candidate 0.3.0rc3.** The public source repository is [Puss-M/wechat-cli](https://github.com/Puss-M/wechat-cli). This candidate has not been published to PyPI or npm. The npm release currently available is 0.2.4 and does not contain the Moments command.
 
 ## Moments export
 

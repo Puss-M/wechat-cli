@@ -186,6 +186,24 @@ def test_missing_xml_author_is_never_exported(tmp_path):
     assert any(item["tid"] == 8 and "作者" in item["reason"] for item in diagnostics["skipped_records"])
 
 
+def test_nested_username_is_not_treated_as_post_author(tmp_path):
+    db_path = tmp_path / "sns.db"
+    _database(db_path)
+    xml = (
+        "<SnsDataItem><TimelineObject><id>109</id><createTime>1700000700</createTime>"
+        "<contentDesc>他人的分享</contentDesc><ContentObject>"
+        "<username>self</username><title>分享内容</title></ContentObject>"
+        "</TimelineObject></SnsDataItem>"
+    )
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("INSERT INTO SnsTimeLine VALUES (?, ?, ?)", (9, "other", xml))
+    records, _, diagnostics = load_own_moments(
+        db_path, "self", return_diagnostics=True
+    )
+    assert "109" not in {record["id"] for record in records}
+    assert any(item["tid"] == 9 for item in diagnostics["skipped_records"])
+
+
 def test_namespaced_nested_xml_and_millisecond_timestamp_are_supported(tmp_path):
     db_path = tmp_path / "sns.db"
     _database(db_path)

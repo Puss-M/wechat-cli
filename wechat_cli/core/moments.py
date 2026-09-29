@@ -35,6 +35,15 @@ def _find_text(element, name):
     return (child.text or "").strip() if child is not None and child.text else ""
 
 
+def _direct_texts(element, name):
+    """Return direct-child text values for fields with strict ownership semantics."""
+    values = []
+    for child in list(element):
+        if _local_name(child.tag) == name:
+            values.append((child.text or "").strip())
+    return values
+
+
 def _get_attr(element, name):
     for key, value in element.attrib.items():
         if _local_name(key) == name:
@@ -152,11 +161,12 @@ def load_own_moments(
                 timeline = root if _local_name(root.tag) == "TimelineObject" else _find_first(root, "TimelineObject")
                 if timeline is None:
                     raise ValueError("缺少 TimelineObject")
-                xml_username = _find_text(timeline, "username")
-                if xml_username and xml_username != self_username:
+                authors = _direct_texts(timeline, "username")
+                if len(authors) != 1 or not authors[0]:
+                    raise ValueError("记录缺少直接 XML 作者")
+                xml_username = authors[0]
+                if xml_username != self_username:
                     raise ValueError("记录作者与当前账号不一致")
-                if not xml_username:
-                    raise ValueError("记录缺少 XML 作者")
                 matched_author_count += 1
                 moment_id = _find_text(timeline, "id") or _get_attr(timeline, "id")
                 if not moment_id or moment_id in seen_ids:

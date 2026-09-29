@@ -4,7 +4,7 @@ import click
 
 from .core.context import AppContext
 
-_VERSION = "0.3.0rc2"
+_VERSION = "0.3.0rc3"
 
 
 class _LazyAppContext:

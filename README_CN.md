@@ -2,7 +2,7 @@
 
 一个免费、在本机运行的微信数据命令行工具。
 
-> **本地发行候选版 0.3.0rc2。**公开源码仓库：[Puss-M/wechat-cli](https://github.com/Puss-M/wechat-cli)。候选版尚未发布到 PyPI 或 npm；npm 当前可安装的版本是 0.2.4，不包含朋友圈命令。
+> **本地发行候选版 0.3.0rc3。**公开源码仓库：[Puss-M/wechat-cli](https://github.com/Puss-M/wechat-cli)。候选版尚未发布到 PyPI 或 npm；npm 当前可安装的版本是 0.2.4，不包含朋友圈命令。
 
 ## 导出自己的朋友圈
 
