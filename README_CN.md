@@ -2,7 +2,7 @@
 
 一个免费、在本机运行的微信数据命令行工具。
 
-> **本地发行候选版 0.3.0rc1。**公开源码仓库：[Puss-M/wechat-cli](https://github.com/Puss-M/wechat-cli)。候选版尚未发布到 PyPI 或 npm；npm 当前可安装的版本是 0.2.4，不包含朋友圈命令。
+> **本地发行候选版 0.3.0rc2。**公开源码仓库：[Puss-M/wechat-cli](https://github.com/Puss-M/wechat-cli)。候选版尚未发布到 PyPI 或 npm；npm 当前可安装的版本是 0.2.4，不包含朋友圈命令。
 
 ## 导出自己的朋友圈
 
@@ -33,6 +33,8 @@ wechat-cli moments --help
 wechat-cli moments --format json --output .\my-moments.json
 wechat-cli moments --format markdown --output .\my-moments.md
 ~~~
+
+命令会扫描朋友圈缓存中的所有候选记录，再按 XML 作者筛选当前账号，因此数据库行使用旧账号别名时也不会漏掉自己的帖子。损坏、重复或归属不明的单条记录默认跳过，并在 JSON 的 `diagnostics` 和 Markdown 的“导出诊断”中列出；需要审计数据完整性时可加 `--strict`，让首个异常直接停止。
 
 为避免覆盖文件，输出文件已存在时命令会停止。再次导出前请更换文件名或自行移走旧文件。
 

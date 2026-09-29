@@ -2,7 +2,7 @@
 
 A free, local command-line tool for your own WeChat data.
 
-> **Local release candidate 0.3.0rc1.** The public source repository is [Puss-M/wechat-cli](https://github.com/Puss-M/wechat-cli). This candidate has not been published to PyPI or npm. The npm release currently available is 0.2.4 and does not contain the Moments command.
+> **Local release candidate 0.3.0rc2.** The public source repository is [Puss-M/wechat-cli](https://github.com/Puss-M/wechat-cli). This candidate has not been published to PyPI or npm. The npm release currently available is 0.2.4 and does not contain the Moments command.
 
 ## Moments export
 
@@ -33,6 +33,8 @@ Before the first data export, start WeChat for Windows and run `wechat-cli init`
 wechat-cli moments --format json --output .\my-moments.json
 wechat-cli moments --format markdown --output .\my-moments.md
 ~~~
+
+The command scans all cached timeline candidates and then filters by the XML author, so rows stored with a legacy account alias are not silently missed. Corrupt, duplicate, or ambiguous rows are skipped by default and listed in JSON `diagnostics` or the Markdown export diagnosis. Add `--strict` when auditing data integrity and require the first anomaly to stop the export.
 
 The command refuses to overwrite an existing output file. Rename or remove the old export before running the same command again.
 

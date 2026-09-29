@@ -18,6 +18,30 @@ class MomentImageDownloadError(ValueError):
     """A local copy of one or more own Moment images could not be fetched."""
 
 
+def _local_name(tag):
+    """Return an XML tag name without a namespace prefix."""
+    return str(tag).rsplit("}", 1)[-1].rsplit(":", 1)[-1]
+
+
+def _find_first(element, name):
+    for candidate in element.iter():
+        if _local_name(candidate.tag) == name:
+            return candidate
+    return None
+
+
+def _find_text(element, name):
+    child = _find_first(element, name)
+    return (child.text or "").strip() if child is not None and child.text else ""
+
+
+def _get_attr(element, name):
+    for key, value in element.attrib.items():
+        if _local_name(key) == name:
+            return (value or "").strip()
+    return ""
+
+
 class _HttpOnlyRedirectHandler(HTTPRedirectHandler):
     """Reject redirects outside HTTP(S), including file and custom schemes."""
 
@@ -28,7 +52,7 @@ class _HttpOnlyRedirectHandler(HTTPRedirectHandler):
 
 
 def _parse_location(timeline):
-    location = timeline.find("location")
+    location = _find_first(timeline, "location")
     if location is None:
         return None
 
@@ -36,7 +60,7 @@ def _parse_location(timeline):
         "country", "city", "poiName", "poiAddress", "poiAddressName",
         "latitude", "longitude",
     )
-    details = {field: location.get(field, "").strip() for field in fields}
+    details = {field: _get_attr(location, field) for field in fields}
     details = {field: value for field, value in details.items() if value}
     labels = {"country", "city", "poiName", "poiAddress", "poiAddressName"}
     has_coordinates = False
@@ -53,26 +77,31 @@ def _parse_location(timeline):
 
 
 def _parse_media(timeline):
-    content_object = timeline.find("ContentObject")
+    content_object = _find_first(timeline, "ContentObject")
     if content_object is None:
         return [], []
 
     media_items = []
     images = []
-    for item in content_object.findall("./mediaList/media"):
-        media_type = item.findtext("type") or item.findtext("mediaType") or ""
-        url = (item.findtext("url") or "").strip()
-        thumbnail = (item.findtext("thumb") or item.findtext("thumbUrl") or "").strip()
+    media_list = _find_first(content_object, "mediaList")
+    if media_list is None:
+        return [], []
+    for item in media_list:
+        if _local_name(item.tag) != "media":
+            continue
+        media_type = _find_text(item, "type") or _find_text(item, "mediaType")
+        url = _find_text(item, "url")
+        thumbnail = _find_text(item, "thumb") or _find_text(item, "thumbUrl")
         kind = "image" if media_type == "2" else "other"
         media = {
-            "id": (item.findtext("id") or "").strip() or None,
+            "id": _find_text(item, "id") or None,
             "type": media_type,
             "kind": kind,
             "url": url or None,
             "thumbnail_url": thumbnail or None,
-            "title": (item.findtext("title") or "").strip() or None,
-            "description": (item.findtext("description") or "").strip() or None,
-            "size": (item.findtext("size") or "").strip() or None,
+            "title": _find_text(item, "title") or None,
+            "description": _find_text(item, "description") or None,
+            "size": _find_text(item, "size") or None,
         }
         media_items.append(media)
         if kind == "image":
@@ -86,55 +115,74 @@ def _parse_media(timeline):
 
 
 def _parse_link(timeline):
-    content_object = timeline.find("ContentObject")
+    content_object = _find_first(timeline, "ContentObject")
     if content_object is None:
         return None
     link = {
-        "url": (content_object.findtext("contentUrl") or "").strip() or None,
-        "title": (content_object.findtext("title") or "").strip() or None,
-        "description": (content_object.findtext("description") or "").strip() or None,
+        "url": _find_text(content_object, "contentUrl") or None,
+        "title": _find_text(content_object, "title") or None,
+        "description": _find_text(content_object, "description") or None,
     }
     return link if any(link.values()) else None
 
 
-def load_own_moments(db_path, self_username, include_empty=False):
+def load_own_moments(
+    db_path,
+    self_username,
+    include_empty=False,
+    strict=False,
+    return_diagnostics=False,
+):
     if not self_username:
         raise MomentDataError("无法确认当前账号 ID，已停止导出")
 
     moments_with_time = []
     skipped_empty = 0
+    skipped_records = []
+    candidate_count = matched_author_count = 0
     seen_ids = set()
     with closing(sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)) as conn:
         rows = conn.execute(
-            "SELECT tid, content FROM SnsTimeLine WHERE user_name = ?",
-            (self_username,),
+            "SELECT tid, user_name, content FROM SnsTimeLine ORDER BY tid",
         )
-        for tid, raw_xml in rows:
+        for tid, _row_username, raw_xml in rows:
+            candidate_count += 1
             try:
                 root = ET.fromstring(raw_xml)
-                timeline = root.find("TimelineObject")
+                timeline = root if _local_name(root.tag) == "TimelineObject" else _find_first(root, "TimelineObject")
                 if timeline is None:
                     raise ValueError("缺少 TimelineObject")
-                if timeline.findtext("username") != self_username:
+                xml_username = _find_text(timeline, "username")
+                if xml_username and xml_username != self_username:
                     raise ValueError("记录作者与当前账号不一致")
-                moment_id = timeline.findtext("id")
+                if not xml_username:
+                    raise ValueError("记录缺少 XML 作者")
+                matched_author_count += 1
+                moment_id = _find_text(timeline, "id") or _get_attr(timeline, "id")
                 if not moment_id or moment_id in seen_ids:
                     raise ValueError("帖子 ID 缺失或重复")
-                created = int(timeline.findtext("createTime"))
+                raw_created = _find_text(timeline, "createTime")
+                created = int(float(raw_created))
+                if created >= 10**12:
+                    created //= 1000
                 if created <= 0:
                     raise ValueError("发布时间无效")
                 timestamp = datetime.fromtimestamp(created).astimezone().isoformat(timespec="seconds")
             except (ET.ParseError, TypeError, ValueError, OverflowError, OSError) as exc:
-                raise MomentDataError(f"朋友圈记录 tid={tid} 无法可靠解析: {exc}") from exc
+                reason = str(exc)
+                if strict:
+                    raise MomentDataError(f"朋友圈记录 tid={tid} 无法可靠解析: {reason}") from exc
+                skipped_records.append({"tid": tid, "reason": reason})
+                continue
 
-            seen_ids.add(moment_id)
-            content = timeline.findtext("contentDesc") or ""
+            content = _find_text(timeline, "contentDesc")
             media, images = _parse_media(timeline)
             location = _parse_location(timeline)
             link = _parse_link(timeline)
             if not content.strip() and not (media or location or link) and not include_empty:
                 skipped_empty += 1
                 continue
+            seen_ids.add(moment_id)
             moments_with_time.append((created, {
                 "id": moment_id,
                 "time": timestamp,
@@ -147,7 +195,17 @@ def load_own_moments(db_path, self_username, include_empty=False):
 
     moments_with_time.sort(key=lambda item: (item[0], item[1]["id"]), reverse=True)
     moments = [moment for _, moment in moments_with_time]
-    return moments, skipped_empty
+    if not return_diagnostics:
+        return moments, skipped_empty
+    diagnostics = {
+        "candidate_count": candidate_count,
+        "matched_author_count": matched_author_count,
+        "exported_count": len(moments),
+        "skipped_empty": skipped_empty,
+        "skipped_invalid": len(skipped_records),
+        "skipped_records": skipped_records,
+    }
+    return moments, skipped_empty, diagnostics
 
 
 def _image_extension(data, content_type=""):
@@ -239,12 +297,20 @@ def download_own_moment_images(moments, destination, timeout=30, limit=0):
     return {"downloaded": downloaded, "reused": reused, "failed": failed}
 
 
-def render_markdown(moments, skipped_empty):
+def render_markdown(moments, skipped_empty, diagnostics=None):
+    diagnostics = diagnostics or {}
     lines = [
         "# 我的朋友圈（本机缓存）", "",
-        f"导出记录：{len(moments)} 条；跳过无内容记录：{skipped_empty} 条。", "",
+        f"导出记录：{len(moments)} 条；跳过无内容记录：{skipped_empty} 条；"
+        f"跳过异常记录：{diagnostics.get('skipped_invalid', 0)} 条。", "",
         "仅包含当前电脑微信缓存中的帖子，不代表账号全部历史。", "",
     ]
+    skipped_records = diagnostics.get("skipped_records", [])
+    if skipped_records:
+        lines.extend(["## 导出诊断", "", "以下记录未导出，原因已保留供排查：", ""])
+        for item in skipped_records:
+            lines.append(f"- tid={item.get('tid')}：{item.get('reason', '未知原因')}")
+        lines.append("")
     for moment in moments:
         lines.extend([
             f"## {moment['time']}", "",

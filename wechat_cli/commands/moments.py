@@ -30,6 +30,8 @@ from ..core.moments import (
 @click.option("--output", "output_path", type=click.Path(dir_okay=False, path_type=str),
               help="保存路径；不指定则输出到终端")
 @click.option("--include-empty", is_flag=True, help="同时保留文字、图片、地点和链接均为空的记录")
+@click.option("--strict", is_flag=True,
+              help="遇到损坏、重复或归属不明记录时立即停止；默认跳过并写入诊断")
 @click.option("--decode-images", is_flag=True, help="从本机 Sns/Img 缓存解码图片到新目录；不访问网络")
 @click.option("--download-images", is_flag=True,
               help="只下载当前账号自己朋友圈 XML 中的图片到本地；不读取混杂缓存")
@@ -45,7 +47,7 @@ from ..core.moments import (
 @click.option("--download-limit", type=click.IntRange(min=0), default=0, show_default=True,
               help="最多下载多少张自己的朋友圈图片；0 表示全部")
 @click.pass_context
-def moments(ctx, fmt, output_path, include_empty, decode_images, download_images,
+def moments(ctx, fmt, output_path, include_empty, strict, decode_images, download_images,
             image_key_file, auto_image_key, xor_key, image_output, image_limit,
             download_limit):
     """导出当前账号在本机缓存中的朋友圈内容和元数据。"""
@@ -59,7 +61,13 @@ def moments(ctx, fmt, output_path, include_empty, decode_images, download_images
         raise click.ClickException("无法访问 sns/sns.db；请检查本机缓存和 wechat-cli 初始化状态")
 
     try:
-        records, skipped_empty = load_own_moments(db_path, self_username, include_empty)
+        records, skipped_empty, diagnostics = load_own_moments(
+            db_path,
+            self_username,
+            include_empty,
+            strict=strict,
+            return_diagnostics=True,
+        )
     except (MomentDataError, sqlite3.Error) as exc:
         raise click.ClickException(str(exc)) from exc
 
@@ -78,13 +86,14 @@ def moments(ctx, fmt, output_path, include_empty, decode_images, download_images
             raise click.ClickException(f"无法准备自己的朋友圈图片下载: {exc}") from exc
 
     if fmt == "markdown":
-        content = render_markdown(records, skipped_empty)
+        content = render_markdown(records, skipped_empty, diagnostics)
     else:
         content = json.dumps({
             "source": "local_sns_cache",
             "scope": "cached_only",
             "count": len(records),
             "skipped_empty": skipped_empty,
+            "diagnostics": diagnostics,
             "moments": records,
         }, ensure_ascii=False, indent=2) + "\n"
 
@@ -94,7 +103,11 @@ def moments(ctx, fmt, output_path, include_empty, decode_images, download_images
                 handle.write(content)
         except OSError as exc:
             raise click.ClickException(f"无法写入输出文件: {exc}") from exc
-        click.echo(f"已导出 {len(records)} 条到: {output_path}（跳过无内容 {skipped_empty} 条）", err=True)
+        click.echo(
+            f"已导出 {len(records)} 条到: {output_path}（跳过无内容 {skipped_empty} 条，"
+            f"跳过异常 {diagnostics['skipped_invalid']} 条）",
+            err=True,
+        )
     else:
         click.echo(content, nl=False)
 

@@ -130,7 +130,7 @@ def test_exports_images_location_and_link_metadata(tmp_path):
     }
 
 
-def test_author_mismatch_aborts_export(tmp_path):
+def test_bad_rows_are_skipped_without_losing_good_rows(tmp_path):
     db_path = tmp_path / "sns.db"
     _database(db_path)
     with sqlite3.connect(db_path) as conn:
@@ -138,12 +138,81 @@ def test_author_mismatch_aborts_export(tmp_path):
             "INSERT INTO SnsTimeLine VALUES (?, ?, ?)",
             (5, "self", _xml("105", "other", 1700000400, "错误归属")),
         )
-    try:
-        load_own_moments(db_path, "self")
-    except MomentDataError as exc:
-        assert "作者" in str(exc)
-    else:
-        raise AssertionError("Mismatched author must abort export")
+        conn.execute(
+            "INSERT INTO SnsTimeLine VALUES (?, ?, ?)",
+            (6, "legacy_alias", _xml("106", "self", 1700000500, "数据库行作者是旧别名")),
+        )
+        conn.execute(
+            "INSERT INTO SnsTimeLine VALUES (?, ?, ?)",
+            (7, "self", "<broken"),
+        )
+    records, skipped, diagnostics = load_own_moments(
+        db_path, "self", return_diagnostics=True
+    )
+    assert [record["id"] for record in records] == ["106", "104", "101"]
+    assert skipped == 1
+    assert diagnostics["candidate_count"] == 7
+    assert diagnostics["matched_author_count"] == 4
+    assert diagnostics["skipped_invalid"] == 3
+    assert {item["tid"] for item in diagnostics["skipped_records"]} == {2, 5, 7}
+
+
+def test_strict_mode_still_aborts_on_bad_row(tmp_path):
+    db_path = tmp_path / "sns.db"
+    _database(db_path)
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            "INSERT INTO SnsTimeLine VALUES (?, ?, ?)",
+            (5, "self", _xml("105", "other", 1700000400, "错误归属")),
+        )
+    with pytest.raises(MomentDataError, match="作者"):
+        load_own_moments(db_path, "self", strict=True)
+
+
+def test_missing_xml_author_is_never_exported(tmp_path):
+    db_path = tmp_path / "sns.db"
+    _database(db_path)
+    xml = (
+        "<SnsDataItem><TimelineObject><id>108</id>"
+        "<createTime>1700000600</createTime><contentDesc>没有作者</contentDesc>"
+        "</TimelineObject></SnsDataItem>"
+    )
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("INSERT INTO SnsTimeLine VALUES (?, ?, ?)", (8, "self", xml))
+    records, _, diagnostics = load_own_moments(
+        db_path, "self", return_diagnostics=True
+    )
+    assert "108" not in {record["id"] for record in records}
+    assert any(item["tid"] == 8 and "作者" in item["reason"] for item in diagnostics["skipped_records"])
+
+
+def test_namespaced_nested_xml_and_millisecond_timestamp_are_supported(tmp_path):
+    db_path = tmp_path / "sns.db"
+    _database(db_path)
+    xml = (
+        '<wx:SnsDataItem xmlns:wx="urn:wx"><wx:Meta><wx:TimelineObject>'
+        '<wx:id>107</wx:id><wx:username>self</wx:username>'
+        '<wx:createTime>1700000600000</wx:createTime>'
+        '<wx:contentDesc>命名空间记录</wx:contentDesc>'
+        "</wx:TimelineObject></wx:Meta></wx:SnsDataItem>"
+    )
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("INSERT INTO SnsTimeLine VALUES (?, ?, ?)", (8, "alias", xml))
+    records, _ = load_own_moments(db_path, "self")
+    record = next(item for item in records if item["id"] == "107")
+    assert record["text"] == "命名空间记录"
+    assert record["time"].startswith("2023-")
+
+
+def test_richer_duplicate_replaces_empty_duplicate(tmp_path):
+    db_path = tmp_path / "sns.db"
+    _database(db_path)
+    richer = _xml("103", "self", 1700000200, "后来补齐的文字")
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("INSERT INTO SnsTimeLine VALUES (?, ?, ?)", (8, "self", richer))
+    records, skipped = load_own_moments(db_path, "self")
+    assert next(item for item in records if item["id"] == "103")["text"] == "后来补齐的文字"
+    assert skipped == 1
 
 
 def test_downloads_only_images_attached_to_own_records(tmp_path):
