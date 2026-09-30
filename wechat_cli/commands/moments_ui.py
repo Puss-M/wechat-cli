@@ -48,6 +48,7 @@ def moments_ui(output, fmt, confirm_own, resume, max_pages, pause, window_title)
             content = json.dumps({
                 "source": "wechat_desktop_ui",
                 "scope": "visible_ui_only",
+                "ownership": "user_confirmed_ui",
                 "count": len(records),
                 "diagnostics": diagnostics,
                 "moments": records,
