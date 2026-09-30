@@ -38,6 +38,8 @@ class UiMoment:
             "location": None,
             "link": link,
             "capture_source": "wechat_ui",
+            "ownership_verified": False,
+            "ownership_verification": "user_confirmed_ui",
             "capture_page": self.page,
             "capture_screenshot": self.screenshot,
         }
@@ -231,12 +233,18 @@ def collect_visible_moments(
 
 def merge_moment_records(local_records, ui_records):
     """Merge UI evidence without replacing richer local XML metadata."""
-    merged = list(local_records)
+    merged = []
+    for item in local_records:
+        record = dict(item)
+        _annotate_ownership(record)
+        merged.append(record)
     by_key = {
         (_date_key(item.get("time")), _clean_text(item.get("text"))): index
         for index, item in enumerate(merged)
     }
     for item in ui_records:
+        item = dict(item)
+        _annotate_ownership(item, default_source="wechat_ui")
         key = (_date_key(item.get("time")), _clean_text(item.get("text")))
         existing = by_key.get(key)
         if existing is None or not key[1]:
@@ -244,8 +252,27 @@ def merge_moment_records(local_records, ui_records):
             by_key[key] = len(merged) - 1
             continue
         current = merged[existing]
-        current.setdefault("ui_captures", []).append({
+        capture = {
             "page": item.get("capture_page"),
             "screenshot": item.get("capture_screenshot"),
-        })
+        }
+        captures = current.setdefault("ui_captures", [])
+        if capture not in captures:
+            captures.append(capture)
     return merged
+
+
+def _annotate_ownership(record, default_source=None):
+    """Keep strict XML ownership separate from user-confirmed UI evidence."""
+    if isinstance(record.get("ownership_verified"), bool):
+        return
+    source = record.get("capture_source") or default_source
+    if source == "wechat_ui":
+        record["ownership_verified"] = False
+        record["ownership_verification"] = "user_confirmed_ui"
+    elif source == "local_sns_cache":
+        record["ownership_verified"] = True
+        record["ownership_verification"] = "xml_author"
+    else:
+        record["ownership_verified"] = False
+        record["ownership_verification"] = "legacy_unknown"
