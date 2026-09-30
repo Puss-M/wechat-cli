@@ -4,7 +4,7 @@ import click
 
 from .core.context import AppContext
 
-_VERSION = "1.0.2"
+_VERSION = "1.0.3"
 
 
 class _LazyAppContext:
@@ -60,6 +60,7 @@ def cli(ctx, config_path):
 from .commands.contacts import contacts
 from .commands.archive_moments import archive_moments
 from .commands.report import report
+from .commands.memory_web import memory_web
 from .commands.export import export
 from .commands.favorites import favorites
 from .commands.history import history
@@ -76,6 +77,7 @@ from .commands.unread import unread
 cli.add_command(init)
 cli.add_command(archive_moments)
 cli.add_command(report)
+cli.add_command(memory_web)
 cli.add_command(sessions)
 cli.add_command(history)
 cli.add_command(search)

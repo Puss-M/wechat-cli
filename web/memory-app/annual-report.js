@@ -1,0 +1,19 @@
+(function(){
+  const records=(window.MEMORY_DATA&&window.MEMORY_DATA.records)||[];
+  const params=new URLSearchParams(location.search);
+  const years=[...new Set(records.map(r=>String(r.created_at_local||'').slice(0,4)).filter(y=>/^\d{4}$/.test(y)))].sort().reverse();
+  const year=params.get('year')&&years.includes(params.get('year'))?params.get('year'):(years[0]||new Date().getFullYear().toString());
+  const esc=s=>String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const dateOf=r=>String(r.created_at_local||'');
+  const assetOf=r=>{const a=Array.isArray(r.archive_assets)?r.archive_assets.find(x=>x&&x.status==='available'&&x.relative_path):null;return a?`../${a.relative_path}`:null};
+  const own=records.filter(r=>dateOf(r).startsWith(year)).sort((a,b)=>dateOf(b).localeCompare(dateOf(a)));
+  const days=new Set(own.map(r=>dateOf(r).slice(0,10))).size;
+  const places={};own.forEach(r=>{const l=r.location||{};const p=[l.city,l.poiName].filter(Boolean).join(' · ');if(p)places[p]=(places[p]||0)+1});
+  const months=Array.from({length:12},(_,i)=>{const m=String(i+1).padStart(2,'0');return {m,n:own.filter(r=>dateOf(r).slice(5,7)===m).length,p:own.find(r=>dateOf(r).slice(5,7)===m&&assetOf(r))}});
+  document.title=`${year} 年度报告`;document.querySelector('#report-edition').textContent=`ANNUAL REPORT / ${year}`;document.querySelector('#year-switch').onclick=()=>{const next=years[(years.indexOf(year)+1)%Math.max(years.length,1)]||year;location.href=`annual-report.html?year=${next}`};
+  const cover=own.find(r=>assetOf(r));
+  const monthHtml=months.map(x=>`<div class="report-month" ${x.p?`style="background-image:linear-gradient(rgba(241,237,228,.68),rgba(241,237,228,.68)),url('${assetOf(x.p)}');background-size:cover;background-position:center"`:''}><strong>${x.m}</strong><span>${x.n?`${x.n} 条记录`:'未覆盖或暂无记录'}</span></div>`).join('');
+  const entries=own.slice(0,80).map(r=>`<article class="report-entry"><time>${esc(dateOf(r)||'时间未知')}</time>${assetOf(r)?`<img src="${assetOf(r)}" alt="" loading="lazy">`:''}<p>${esc(r.text||'（无文字记录）')}</p><small>${esc((r.location||{}).city||'地点未记录')} · ${esc(r.verification||'来源未确认')}</small></article>`).join('');
+  const placeHtml=Object.entries(places).sort((a,b)=>b[1]-a[1]).slice(0,18).map(([p,n])=>`<div class="place"><b>${esc(p)}</b><span>${n} 条</span></div>`).join('');
+  document.querySelector('#report').innerHTML=`<article class="report"><section class="report-cover">${cover?`<figure class="report-cover-image"><img src="${assetOf(cover)}" alt="${esc(cover.text||year+' 年的记忆')}"><figcaption>${esc(dateOf(cover))}</figcaption></figure>`:''}<div class="report-kicker">PERSONAL ARCHIVE / ${year}</div><h1>这一年<br><em>写下的事</em></h1><p class="lead">这是从当前本地归档里整理出的 ${year} 年。它只写被保存下来的部分，也把没有覆盖到的月份留在页面上。</p><div class="report-stats"><div class="report-stat"><strong>${own.length}</strong><span>条记录</span></div><div class="report-stat"><strong>${days}</strong><span>个活跃日</span></div><div class="report-stat"><strong>${Object.keys(places).length}</strong><span>个地点</span></div><div class="report-stat"><strong>${own.reduce((n,r)=>n+(Array.isArray(r.images)?r.images.length:0),0)}</strong><span>图片条目</span></div></div></section><section class="report-section"><div class="label">TWELVE MONTHS</div><h2>月份目录</h2><div class="report-month-grid">${monthHtml}</div></section><section class="report-section"><div class="label">A YEAR IN FRAGMENTS</div><h2>时间线</h2><div class="report-timeline">${entries||'<p class="report-empty">这一年当前没有可展示的记录。</p>'}</div></section><section class="report-section"><div class="label">PLACES</div><h2>去过的地方</h2><div class="places">${placeHtml||'<p class="report-empty">没有可识别地点。</p>'}</div></section><footer class="report-foot"><span>PRIVATE / LOCAL / READ-ONLY SOURCE</span><span>${year} · ${own.length} RECORDS</span></footer></article>`;
+})();

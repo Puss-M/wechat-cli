@@ -32,8 +32,13 @@ Thumbs.db
 
 # Generated exports and private WeChat data
 outputs/
+output/
+.playwright-cli/
 my-moment-images/
 my-moments-archive/
+memory-app/
+!web/memory-app/
+!web/memory-app/**
 wechat-backup/
 backup/
 reports/

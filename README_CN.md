@@ -2,7 +2,7 @@
 
 一个免费、在本机运行的微信数据命令行工具。
 
-> **v1.0.2。**公开源码仓库：[Puss-M/wechat-cli](https://github.com/Puss-M/wechat-cli)。当前提供源码 ZIP 和 wheel，暂未发布到 PyPI 或 npm。
+> **v1.0.3。**公开源码仓库：[Puss-M/wechat-cli](https://github.com/Puss-M/wechat-cli)。当前提供源码 ZIP 和 wheel，暂未发布到 PyPI 或 npm。
 
 v1 增加可选的微信桌面界面采集：它不会上传数据，会在本地滚动已打开的微信窗口，保存每页截图和能从辅助功能树读取的文字/链接，再与本地缓存去重合并。微信没有暴露给辅助功能树的图片、地点或卡片字段，会保留在截图中，不会被伪造为结构化字段。
 
@@ -46,6 +46,17 @@ wechat-cli moments --format markdown --output .\my-moments.md
 wechat-cli moments --format json --output .\my-moments.json
 wechat-cli archive-moments --input .\my-moments.json --archive-dir .\my-moments-archive
 ~~~
+
+### 生成个人记忆 Web App
+
+归档完成后，可以生成离线浏览的私人杂志式 Web App：
+
+~~~powershell
+wechat-cli memory-web --archive-dir .\my-moments-archive
+python -m http.server 4173 --directory .\my-moments-archive
+~~~
+
+打开 `http://127.0.0.1:4173/memory-app/`。页面包含年度总览、年度刊物、最近回忆和回忆旅程；数据只读取本地归档，不上传朋友圈内容。
 
 归档目录包含 `moments.sqlite`、`snapshots/` 和 `assets/`。重复导入可以使用新的批次继续合并；手动指定 `--batch-id` 时必须使用尚未使用的批次名。无完整年份的 UI 日期、未知归属或缺失媒体会标记为不完整，不会被悄悄当作完整记录。归档仍只包含本机可读取到的内容，不代表微信账号全部历史。
 
