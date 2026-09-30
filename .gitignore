@@ -32,6 +32,8 @@ Thumbs.db
 
 # Generated exports and private WeChat data
 outputs/
+my-moment-images/
+my-moments-archive/
 wechat-backup/
 backup/
 reports/

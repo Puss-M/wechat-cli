@@ -4,6 +4,7 @@ import json
 import os
 import sqlite3
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 
 import click
@@ -35,12 +36,13 @@ from ..core.ui_moments import UiCaptureError, collect_visible_moments, merge_mom
 @click.option("--include-empty", is_flag=True, help="同时保留文字、图片、地点和链接均为空的记录")
 @click.option("--strict", is_flag=True,
               help="遇到损坏、重复或归属不明记录时立即停止；默认跳过并写入诊断")
-@click.option("--decode-images", is_flag=True, help="从本机 Sns/Img 缓存解码图片到新目录；不访问网络")
+@click.option("--decode-images/--no-decode-images", default=True,
+              help="默认从本机 Sns/Img 缓存解码本人朋友圈图片；不访问网络")
 @click.option("--download-images", is_flag=True,
               help="只下载当前账号自己朋友圈 XML 中的图片到本地；不读取混杂缓存")
 @click.option("--image-key-file", type=click.Path(dir_okay=False, path_type=str),
               help="V2 图片密钥文件：16 字节 ASCII 或 32 位十六进制")
-@click.option("--auto-image-key", is_flag=True,
+@click.option("--auto-image-key/--no-auto-image-key", default=True,
               help="从当前账号自己的图片缓存派生密钥；必要时回退到可选 wx_key；不联网")
 @click.option("--xor-key", type=str, help="可选的图片尾部 XOR 密钥，例如 0xF4")
 @click.option("--image-output", type=click.Path(file_okay=False, path_type=str),
@@ -142,8 +144,9 @@ def moments(ctx, fmt, output_path, include_empty, strict, decode_images, downloa
         except (OSError, KeyError) as exc:
             raise click.ClickException(f"无法准备自己的朋友圈图片下载: {exc}") from exc
 
-    if decode_images:
-        _decode_sns_images(app, records, image_key_file, auto_image_key, xor_key, image_output, image_limit)
+    if decode_images and os.path.isdir(app.db_dir):
+        _decode_sns_images(app, records, image_key_file, auto_image_key and not image_key_file,
+                           xor_key, image_output, image_limit)
 
     if fmt == "markdown":
         content = render_markdown(records, skipped_empty, diagnostics)
@@ -294,7 +297,8 @@ def _decode_sns_images(app, records, image_key_file, auto_image_key, xor_key, im
 
     manifest_path = destination / "manifest.json"
     if manifest_path.exists():
-        raise click.ClickException(f"图片 manifest 已存在，未覆盖: {manifest_path}")
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+        manifest_path = destination / f"manifest-{stamp}.json"
     manifest_path.write_text(json.dumps({
         "source": "local_sns_image_cache",
         "scope": "own_moments_only",

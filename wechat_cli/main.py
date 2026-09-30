@@ -58,6 +58,8 @@ def cli(ctx, config_path):
 
 # 注册子命令
 from .commands.contacts import contacts
+from .commands.archive_moments import archive_moments
+from .commands.report import report
 from .commands.export import export
 from .commands.favorites import favorites
 from .commands.history import history
@@ -72,6 +74,8 @@ from .commands.stats import stats
 from .commands.unread import unread
 
 cli.add_command(init)
+cli.add_command(archive_moments)
+cli.add_command(report)
 cli.add_command(sessions)
 cli.add_command(history)
 cli.add_command(search)

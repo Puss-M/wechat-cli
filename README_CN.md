@@ -36,6 +36,31 @@ wechat-cli moments --format json --output .\my-moments.json
 wechat-cli moments --format markdown --output .\my-moments.md
 ~~~
 
+命令默认会离线解码本机缓存中能确认属于自己的朋友圈图片，并写入 `~/.wechat-cli/decoded_images`；只导出文字和元数据时使用 `--no-decode-images`。
+
+### 建立本地朋友圈归档
+
+导出 JSON 后，可以导入独立的规范化归档目录。归档保留每次导入快照，在 SQLite 中按朋友圈 ID 去重并记录内容版本；已有本地图片和截图会复制到归档的 `assets/` 并使用相对路径。
+
+~~~powershell
+wechat-cli moments --format json --output .\my-moments.json
+wechat-cli archive-moments --input .\my-moments.json --archive-dir .\my-moments-archive
+~~~
+
+归档目录包含 `moments.sqlite`、`snapshots/` 和 `assets/`。重复导入可以使用新的批次继续合并；手动指定 `--batch-id` 时必须使用尚未使用的批次名。无完整年份的 UI 日期、未知归属或缺失媒体会标记为不完整，不会被悄悄当作完整记录。归档仍只包含本机可读取到的内容，不代表微信账号全部历史。
+
+### 生成月度、年度和回忆报告
+
+报告只读取规范化归档，不会重新扫描微信，也不会联网。月报和年报只把能够可靠归属到完整年月的记录纳入趋势统计；无年份、无时区或 UI 未逐条 XML 验证的内容会在“数据覆盖”中单列。
+
+~~~powershell
+wechat-cli report --archive-dir .\my-moments-archive --kind monthly --period 2026-09
+wechat-cli report --archive-dir .\my-moments-archive --kind yearly --period 2026
+wechat-cli report --archive-dir .\my-moments-archive --kind journey --format html
+~~~
+
+默认输出到归档目录的 `reports/`，可用 `--output` 指定文件。月度小记包含发帖数、活跃天数、媒体/地点统计和原帖时间线；年度报告增加月度趋势；回忆旅程按时间排列所有归档记录并汇总地点。第一版不自动生成叙事性事实，避免把缺失数据写成完整经历。
+
 补齐未缓存历史（先在微信中打开“我 → 朋友圈”并保持窗口可见）：
 
 ~~~powershell
@@ -60,7 +85,7 @@ wechat-cli moments-ui --confirm-own --max-pages 300 --output .\my-moments-ui.jso
 有两种可选方式：
 
 - --download-images 会向当前账号自己朋友圈记录中的图片地址发起网络请求。
-- --decode-images 离线读取微信本机图片缓存，只处理能由自己帖子 ID 和图片 ID 映射的缓存文件。
+- 默认离线读取微信本机图片缓存，只处理能由自己帖子 ID 和图片 ID 映射的缓存文件；`--no-decode-images` 可关闭。
 
 先下载一张验证：
 
