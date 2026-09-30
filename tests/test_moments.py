@@ -6,7 +6,8 @@ from unittest.mock import patch
 from click.testing import CliRunner
 import pytest
 
-from wechat_cli.commands.moments import moments
+from wechat_cli.commands.moments import _decode_sns_images, moments
+from wechat_cli.core.image_cache import CacheImage, DecodedImage, own_sns_cache_names
 from wechat_cli.core.moments import (
     MomentDataError,
     MomentImageDownloadError,
@@ -249,6 +250,35 @@ def test_downloads_only_images_attached_to_own_records(tmp_path):
     assert stats == {"downloaded": 1, "reused": 0, "failed": 0}
 
 
+def test_download_falls_back_to_thumbnail_url(tmp_path):
+    moments = [{
+        "id": "own-106",
+        "images": [{
+            "url": "https://example.test/expired.jpg",
+            "thumbnail_url": "https://example.test/thumb.jpg",
+        }],
+    }]
+    calls = []
+
+    def fetch(url, timeout=30):
+        calls.append(url)
+        if url.endswith("expired.jpg"):
+            raise MomentImageDownloadError("图片请求失败: HTTP 400")
+        return b"\xff\xd8\xffthumb\xff\xd9", "image/jpeg"
+
+    with patch("wechat_cli.core.moments._fetch_image", side_effect=fetch):
+        stats = download_own_moment_images(moments, tmp_path / "images")
+
+    target = tmp_path / "images" / "moments" / "own-106" / "01.jpg"
+    assert calls == [
+        "https://example.test/expired.jpg",
+        "https://example.test/thumb.jpg",
+    ]
+    assert target.read_bytes() == b"\xff\xd8\xffthumb\xff\xd9"
+    assert moments[0]["images"][0]["download_source"].endswith("thumb.jpg")
+    assert stats == {"downloaded": 1, "reused": 0, "failed": 0}
+
+
 def test_download_redirect_rejects_non_http_schemes():
     handler = _HttpOnlyRedirectHandler()
     with pytest.raises(MomentImageDownloadError, match="不支持的协议"):
@@ -281,3 +311,45 @@ def test_command_writes_json_without_overwriting(tmp_path):
         second = CliRunner().invoke(moments, ["--output", str(output)], obj=App())
         assert second.exit_code != 0
         assert "未覆盖" in second.output
+
+
+def test_decode_updates_manifest_and_json_image_mapping(tmp_path):
+    account_root = tmp_path / "account"
+    db_dir = account_root / "db"
+    cache_path = account_root / "cache" / "2026-09" / "Sns" / "Img" / "ab" / "cache-file"
+    cache_path.parent.mkdir(parents=True)
+    cache_path.write_bytes(b"cache")
+    records = [{
+        "id": "moment-1",
+        "images": [{"id": "media-1", "url": "https://example.test/image.jpg"}],
+    }]
+    cache_name = next(iter(own_sns_cache_names("moment-1", "media-1")))
+    cache_path = cache_path.with_name(cache_name)
+    cache_path.write_bytes(b"cache")
+    item = CacheImage(cache_path, "2026-09", 5, "07085632")
+
+    class App:
+        pass
+
+    App.db_dir = str(db_dir)
+    with patch(
+        "wechat_cli.commands.moments.discover_local_image_key",
+        return_value=(b"0123456789abcdef", 0xF9),
+    ), patch(
+        "wechat_cli.commands.moments.iter_own_sns_images",
+        return_value=iter([item]),
+    ), patch(
+        "wechat_cli.commands.moments.decode_cache_file",
+        return_value=DecodedImage(b"\xff\xd8\xffimage\xff\xd9", ".jpg", 0xF9, "v2"),
+    ):
+        _decode_sns_images(App(), records, None, True, None, str(tmp_path / "images"), 0)
+
+    image = records[0]["images"][0]
+    assert image["local_path"].endswith(".jpg")
+    assert image["local_size"] == 10
+    assert image["decode_source"] == str(cache_path.resolve())
+    manifest = json.loads((tmp_path / "images" / "manifest.json").read_text(encoding="utf-8"))
+    entry = manifest["images"][0]
+    assert entry["moment_id"] == "moment-1"
+    assert entry["media_id"] == "media-1"
+    assert entry["image_index"] == 1
