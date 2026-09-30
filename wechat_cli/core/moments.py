@@ -1,6 +1,7 @@
 """Read the current account's cached Moments from sns.db."""
 
 import sqlite3
+import time
 from defusedxml import ElementTree as ET  # type: ignore[import-untyped]
 from contextlib import closing
 from datetime import datetime
@@ -201,6 +202,9 @@ def load_own_moments(
                 "media": media,
                 "location": location,
                 "link": link,
+                "capture_source": "local_sns_cache",
+                "ownership_verified": True,
+                "ownership_verification": "xml_author",
             }))
 
     moments_with_time.sort(key=lambda item: (item[0], item[1]["id"]), reverse=True)
@@ -238,32 +242,58 @@ def _image_extension(data, content_type=""):
     }.get(content_type, ".bin")
 
 
-def _fetch_image(url, timeout=30, max_bytes=50 * 1024 * 1024):
+def _fetch_image(url, timeout=30, max_bytes=50 * 1024 * 1024, retries=2):
     parsed = urlparse(url)
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         raise MomentImageDownloadError("图片地址不是受支持的 HTTP(S) 地址")
-    request = Request(url, headers={"User-Agent": "wechat-cli/0.2"})
-    try:
-        opener = build_opener(_HttpOnlyRedirectHandler())
-        with opener.open(request, timeout=timeout) as response:
-            content_length = response.headers.get("Content-Length")
-            if content_length and int(content_length) > max_bytes:
-                raise MomentImageDownloadError("图片超过 50 MB 限制")
-            chunks = []
-            total = 0
-            while True:
-                chunk = response.read(1024 * 1024)
-                if not chunk:
-                    break
-                total += len(chunk)
-                if total > max_bytes:
+    headers = {
+        "User-Agent": "wechat-cli/1.0",
+        "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+        "Referer": "https://weixin.qq.com/",
+    }
+    opener = build_opener(_HttpOnlyRedirectHandler())
+    attempts = max(0, int(retries)) + 1
+    last_error = None
+    for attempt in range(attempts):
+        request = Request(url, headers=headers)
+        try:
+            with opener.open(request, timeout=timeout) as response:
+                content_length = response.headers.get("Content-Length")
+                if content_length and int(content_length) > max_bytes:
                     raise MomentImageDownloadError("图片超过 50 MB 限制")
-                chunks.append(chunk)
-            return b"".join(chunks), response.headers.get_content_type()
-    except (HTTPError, URLError, TimeoutError, OSError, ValueError) as exc:
-        if isinstance(exc, MomentImageDownloadError):
+                chunks = []
+                total = 0
+                while True:
+                    chunk = response.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    total += len(chunk)
+                    if total > max_bytes:
+                        raise MomentImageDownloadError("图片超过 50 MB 限制")
+                    chunks.append(chunk)
+                return b"".join(chunks), response.headers.get_content_type()
+        except MomentImageDownloadError:
             raise
-        raise MomentImageDownloadError(f"图片请求失败: {exc}") from exc
+        except HTTPError as exc:
+            retryable = exc.code in {408, 425, 429} or 500 <= exc.code <= 599
+            last_error = MomentImageDownloadError(f"图片请求失败: HTTP {exc.code}")
+            if not retryable:
+                raise last_error from exc
+        except (URLError, TimeoutError, OSError, ValueError) as exc:
+            last_error = MomentImageDownloadError(f"图片请求失败: {exc}")
+        if attempt + 1 < attempts:
+            time.sleep(0.4 * (2 ** attempt))
+    raise last_error or MomentImageDownloadError("图片请求失败")
+
+
+def _image_url_candidates(image):
+    """Return unique original/thumbnail URLs in the preferred download order."""
+    candidates = []
+    for key in ("url", "thumbnail_url"):
+        value = (image.get(key) or "").strip()
+        if value and value not in candidates:
+            candidates.append(value)
+    return candidates
 
 
 def download_own_moment_images(moments, destination, timeout=30, limit=0):
@@ -281,27 +311,39 @@ def download_own_moment_images(moments, destination, timeout=30, limit=0):
             if limit and attempted >= limit:
                 return {"downloaded": downloaded, "reused": reused, "failed": failed}
             attempted += 1
-            url = image.get("url") or image.get("thumbnail_url")
-            if not url:
+            urls = _image_url_candidates(image)
+            if not urls:
                 image["download_error"] = "朋友圈记录没有图片地址"
                 failed += 1
                 continue
+            errors = []
+            downloaded_image = False
             try:
                 if not moment_dir.exists():
                     moment_dir.mkdir(parents=True, exist_ok=True)
-                data, content_type = _fetch_image(url, timeout=timeout)
-                extension = _image_extension(data, content_type)
-                target = moment_dir / f"{index:02d}{extension}"
-                if target.exists():
-                    reused += 1
-                else:
-                    temporary = target.with_suffix(target.suffix + ".part")
-                    temporary.write_bytes(data)
-                    temporary.replace(target)
-                    downloaded += 1
-                image["local_path"] = str(target)
-                image["local_size"] = len(data)
-            except (MomentImageDownloadError, OSError) as exc:
+                for url in urls:
+                    try:
+                        data, content_type = _fetch_image(url, timeout=timeout)
+                        extension = _image_extension(data, content_type)
+                        target = moment_dir / f"{index:02d}{extension}"
+                        if target.exists() and target.stat().st_size > 0:
+                            reused += 1
+                        else:
+                            temporary = target.with_suffix(target.suffix + ".part")
+                            temporary.write_bytes(data)
+                            temporary.replace(target)
+                            downloaded += 1
+                        image["local_path"] = str(target)
+                        image["local_size"] = len(data)
+                        image["download_source"] = url
+                        downloaded_image = True
+                        break
+                    except (MomentImageDownloadError, OSError) as exc:
+                        errors.append(str(exc))
+                if not downloaded_image:
+                    image["download_error"] = "；".join(errors) or "图片下载失败"
+                    failed += 1
+            except OSError as exc:
                 image["download_error"] = str(exc)
                 failed += 1
     return {"downloaded": downloaded, "reused": reused, "failed": failed}
@@ -315,6 +357,8 @@ def render_markdown(moments, skipped_empty, diagnostics=None):
         f"跳过异常记录：{diagnostics.get('skipped_invalid', 0)} 条。", "",
         "仅包含当前电脑微信缓存中的帖子，不代表账号全部历史。", "",
     ]
+    if any(item.get("ownership_verification") == "user_confirmed_ui" for item in moments):
+        lines.extend(["归属说明：UI 记录来自用户确认的‘我 → 朋友圈’页面，未逐条经过 XML 作者校验。", ""])
     skipped_records = diagnostics.get("skipped_records", [])
     if skipped_records:
         lines.extend(["## 导出诊断", "", "以下记录未导出，原因已保留供排查：", ""])
