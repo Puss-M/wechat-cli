@@ -14,6 +14,7 @@ from ..core.image_cache import (
     ImageDecodeError,
     decode_cache_file,
     iter_own_sns_images,
+    own_sns_cache_names,
     output_name,
     discover_local_image_key,
     read_image_key,
@@ -141,12 +142,16 @@ def moments(ctx, fmt, output_path, include_empty, strict, decode_images, downloa
         except (OSError, KeyError) as exc:
             raise click.ClickException(f"无法准备自己的朋友圈图片下载: {exc}") from exc
 
+    if decode_images:
+        _decode_sns_images(app, records, image_key_file, auto_image_key, xor_key, image_output, image_limit)
+
     if fmt == "markdown":
         content = render_markdown(records, skipped_empty, diagnostics)
     else:
         content = json.dumps({
             "source": "local_sns_cache",
             "scope": "local_cache_plus_ui" if ui_collect else "cached_only",
+            "ownership": "user_confirmed_ui_plus_xml_verified" if ui_collect else "xml_author_verified",
             "count": len(records),
             "skipped_empty": skipped_empty,
             "diagnostics": diagnostics,
@@ -196,10 +201,6 @@ def moments(ctx, fmt, output_path, include_empty, strict, decode_images, downloa
             err=True,
         )
 
-    if decode_images:
-        _decode_sns_images(app, records, image_key_file, auto_image_key, xor_key, image_output, image_limit)
-
-
 def _parse_xor_key(value):
     if value is None:
         return None
@@ -232,18 +233,44 @@ def _decode_sns_images(app, records, image_key_file, auto_image_key, xor_key, im
     except (OSError, ImageDecodeError) as exc:
         raise click.ClickException(f"无法准备图片解码: {exc}") from exc
 
+    cache_index = {}
+    for moment in records:
+        moment_id = str(moment.get("id") or "")
+        for image_index, image in enumerate(moment.get("images", []), start=1):
+            media_id = str(image.get("id") or "")
+            for cache_name in own_sns_cache_names(moment_id, media_id):
+                cache_index.setdefault(cache_name.lower(), []).append(
+                    (moment, image, image_index, moment_id, media_id)
+                )
+
     manifest = []
     scanned = decoded = failed = 0
     for item in iter_own_sns_images(app.db_dir, records):
         if image_limit and scanned >= image_limit:
             break
         scanned += 1
+        matches = cache_index.get(item.path.name.lower(), [])
+        match = matches[0] if matches else None
+        metadata = {}
+        if match:
+            _moment, _image, image_index, moment_id, media_id = match
+            metadata = {
+                "moment_id": moment_id,
+                "media_id": media_id,
+                "image_index": image_index,
+            }
         try:
             result = decode_cache_file(item.path, key, parsed_xor)
             name = output_name(item.path, result.data, result.extension)
             target = destination / name
             if not target.exists():
                 target.write_bytes(result.data)
+            if match:
+                _moment, image, _image_index, _moment_id, _media_id = match
+                image["local_path"] = str(target.resolve())
+                image["local_size"] = len(result.data)
+                image["decode_source"] = str(item.path.resolve())
+                image["decode_format"] = result.extension.lstrip(".")
             decoded += 1
             manifest.append({
                 "source": str(item.path.relative_to(Path(app.db_dir).resolve().parent)),
@@ -253,6 +280,7 @@ def _decode_sns_images(app, records, image_key_file, auto_image_key, xor_key, im
                 "size": len(result.data),
                 "xor_key": f"0x{result.xor_key:02X}",
                 "version": result.version,
+                **metadata,
             })
         except (OSError, ImageDecodeError) as exc:
             failed += 1
@@ -261,6 +289,7 @@ def _decode_sns_images(app, records, image_key_file, auto_image_key, xor_key, im
                 "month": item.month,
                 "status": "failed",
                 "error": str(exc),
+                **metadata,
             })
 
     manifest_path = destination / "manifest.json"
