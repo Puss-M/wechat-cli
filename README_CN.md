@@ -2,7 +2,7 @@
 
 一个免费、在本机运行的微信数据命令行工具。
 
-> **v1.0.0。**公开源码仓库：[Puss-M/wechat-cli](https://github.com/Puss-M/wechat-cli)。当前提供源码 ZIP 和 wheel，暂未发布到 PyPI 或 npm。
+> **v1.0.2。**公开源码仓库：[Puss-M/wechat-cli](https://github.com/Puss-M/wechat-cli)。当前提供源码 ZIP 和 wheel，暂未发布到 PyPI 或 npm。
 
 v1 增加可选的微信桌面界面采集：它不会上传数据，会在本地滚动已打开的微信窗口，保存每页截图和能从辅助功能树读取的文字/链接，再与本地缓存去重合并。微信没有暴露给辅助功能树的图片、地点或卡片字段，会保留在截图中，不会被伪造为结构化字段。
 
@@ -68,15 +68,33 @@ wechat-cli moments-ui --confirm-own --max-pages 300 --output .\my-moments-ui.jso
 wechat-cli moments --download-images --download-limit 1 --image-output .\my-moment-images --format json --output .\my-moments-with-images.json
 ~~~
 
+网络下载依赖朋友圈 XML 中保存的图片地址。微信地址可能已经过期或要求微信客户端鉴权，出现 HTTP 400 时不代表 XML 中没有图片；命令会尝试原图和缩略图，仍失败则在对应图片项写入 `download_error`，不会生成空文件。
+
 离线解码缓存图片：
 
 ~~~powershell
-wechat-cli moments --decode-images --auto-image-key --image-limit 1 --image-output .\my-own-images
+wechat-cli moments --decode-images --auto-image-key --image-limit 1 --image-output .\my-own-images --format json --output .\my-moments-with-local-images.json
 ~~~
 
-密钥会优先根据本机元数据和映射到自己帖子的图片缓存推导。如果微信版本不适用该规则，可选用本机 wx_key 扩展，或通过 --image-key-file 指定密钥。密钥探测不会读取其他朋友圈图片。输出目录中会生成图片和 manifest 清单，记录成功与失败的文件。
+密钥会优先根据本机元数据和映射到自己帖子的图片缓存推导。如果微信版本不适用该规则，可选用本机 wx_key 扩展，或通过 --image-key-file 指定密钥。密钥探测不会读取其他朋友圈图片。输出目录中会生成图片和 `manifest.json`，清单会记录 `moment_id`、`media_id`、图片序号、缓存源文件和输出文件；JSON 中对应的图片项也会写入 `local_path`、`local_size` 和 `decode_source`，可以反查“这张图片属于哪条朋友圈”。
+
+缓存文件名规则属于按微信版本观察到的实验性映射，不保证覆盖所有版本；缺少帖子 ID、图片 ID 或匹配缓存时会跳过，不会扫描无关图片。`manifest.json` 的 `decoded` 只表示当前电脑实际找到并解码的缓存图片。如果导出的朋友圈图片条目数大于 `decoded`，差额表示这些历史图片没有出现在当前电脑可映射的缓存中，不能据此宣称已经恢复微信服务器上的全部历史图片。
+
+离线解码只读取当前微信账号目录下、由本人帖子 ID 和图片 ID 推导出的缓存文件，不会把其他账号的混杂图片导出。图片验证完成后，可直接打开 `manifest.json` 中的 `output` 路径，或打开 JSON 图片项中的 `local_path`。
 
 确认样例图片正常后，去掉数量限制即可处理所有可映射的图片。缓存不存在、记录缺少图片 ID 或帖子未缓存时，图片可能无法导出。
+
+### 恢复限制
+
+请把本工具理解为“读取自己能访问到的数据”，而不是微信服务器恢复工具：
+
+- 截至 v1.0.2，微信没有向个人账号公开一个可按 `moment_id` 导出或恢复朋友圈历史图片的免费接口。本工具不能凭帖子 ID 重新生成已经失效或不可访问的原图。
+- `--download-images` 只能请求朋友圈 XML 中仍然有效的图片地址；地址可能过期、需要微信客户端鉴权，或只返回缩略图。请求失败时不会伪造空文件。
+- `--decode-images` 只能处理当前电脑微信账号目录中仍存在、并且能由本人帖子 ID 和图片 ID 映射的缓存。`manifest.json` 的 `decoded` 数量不等于账号的全部历史图片数量。
+- 在微信客户端中重新打开“我 → 朋友圈”并点开缺失图片，可能让微信重新下载并生成本机缓存；这取决于服务器仍保留图片以及当前登录状态。重新加载后再运行 `--decode-images` 才能尝试离线导出。
+- 如果当前电脑、手机和旧备份中都没有图片，且微信客户端也无法显示，免费本地 CLI 没有可用数据源可以恢复原图。旧手机、旧电脑或系统备份应先保留，不要先清理微信缓存或卸载微信。
+- `--ui-collect` 保存的是微信窗口截图和能从辅助功能树读取的文字/链接；截图可作为证据查看，但不能保证还原成原始图片文件，也不能补出微信没有暴露的地点、卡片或图片字段。
+- 不要把微信二维码、Cookie、数据库、密钥或登录目录上传给所谓“朋友圈恢复服务器”。本工具默认不上传微信数据，也不需要第三方服务器账号。
 
 ### 其他命令
 
