@@ -4,7 +4,12 @@ import click
 
 from .core.context import AppContext
 
-_VERSION = "1.0.3"
+try:
+    from importlib.metadata import version as _pkg_version
+
+    _VERSION = _pkg_version("wechat-cli")
+except Exception:  # 未安装（直接跑源码目录）时回退
+    _VERSION = "1.0.3"
 
 
 class _LazyAppContext:

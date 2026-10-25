@@ -21,13 +21,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
         python-version: ["3.10", "3.12", "3.13"]
         exclude:
           # Windows 上只验证主用版本，节省额度
           - os: windows-latest
             python-version: "3.10"
           - os: windows-latest
+            python-version: "3.13"
+          # macOS 验证 3.12（有独立的密钥扫描器实现，其余组合省略）
+          - os: macos-latest
+            python-version: "3.10"
+          - os: macos-latest
             python-version: "3.13"
     runs-on: ${{ matrix.os }}
     steps:
