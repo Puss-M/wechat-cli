@@ -2,7 +2,12 @@
 
 import click
 
-from ..core.contacts import get_contact_full, get_contact_names, resolve_username, get_contact_detail
+from ..core.contacts import (
+    get_contact_detail,
+    get_contact_full,
+    get_contact_names,
+    resolve_username,
+)
 from ..output.formatter import output
 
 
@@ -27,7 +32,8 @@ def contacts(ctx, query, detail, limit, fmt):
         _show_detail(app, detail, fmt)
         return
 
-    names = get_contact_names(app.cache, app.decrypted_dir)
+    # 预取联系人缓存，get_contact_full 复用同一份全局缓存
+    get_contact_names(app.cache, app.decrypted_dir)
     full = get_contact_full(app.cache, app.decrypted_dir)
 
     if query:
@@ -56,7 +62,8 @@ def contacts(ctx, query, detail, limit, fmt):
 
 def _show_detail(app, name_or_id, fmt):
     """显示联系人详情。"""
-    names = get_contact_names(app.cache, app.decrypted_dir)
+    # 预取缓存，后续 resolve_username / get_contact_detail 复用
+    get_contact_names(app.cache, app.decrypted_dir)
 
     # 尝试解析为 username
     username = resolve_username(name_or_id, app.cache, app.decrypted_dir)

@@ -2,13 +2,14 @@
 
 import sqlite3
 import time
-from defusedxml import ElementTree as ET  # type: ignore[import-untyped]
 from contextlib import closing
 from datetime import datetime
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
+
+from defusedxml import ElementTree as ET  # type: ignore[import-untyped]
 
 
 class MomentDataError(ValueError):

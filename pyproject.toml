@@ -38,3 +38,16 @@ where = ["."]
 
 [tool.setuptools.package-data]
 wechat_cli = ["bin/*"]
+
+[tool.ruff]
+line-length = 140
+target-version = "py310"
+
+[tool.ruff.lint]
+# 核心正确性 + 现代化规则；SIM/PERF 重构建议与 BLE/S/PLW 逐例判断类暂不启用
+select = ["E", "F", "W", "I", "UP", "B"]
+# E501: 输出模板中含长中文串；E402: pywinauto 等 Windows-only 依赖需条件导入；B007: 遍历占位变量
+ignore = ["E501", "E402", "B007"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -9,15 +9,15 @@ from pathlib import Path
 
 import click
 
-from ..core.contacts import get_self_username
 from ..core.config import load_config
+from ..core.contacts import get_self_username
 from ..core.image_cache import (
     ImageDecodeError,
     decode_cache_file,
-    iter_own_sns_images,
-    own_sns_cache_names,
-    output_name,
     discover_local_image_key,
+    iter_own_sns_images,
+    output_name,
+    own_sns_cache_names,
     read_image_key,
 )
 from ..core.moments import (
@@ -26,7 +26,11 @@ from ..core.moments import (
     load_own_moments,
     render_markdown,
 )
-from ..core.ui_moments import UiCaptureError, collect_visible_moments, merge_moment_records
+from ..core.ui_moments import (
+    UiCaptureError,
+    collect_visible_moments,
+    merge_moment_records,
+)
 
 
 @click.command("moments")

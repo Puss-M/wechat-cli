@@ -8,7 +8,11 @@ from pathlib import Path
 import click
 
 from ..core.moments import render_markdown
-from ..core.ui_moments import UiCaptureError, collect_visible_moments, merge_moment_records
+from ..core.ui_moments import (
+    UiCaptureError,
+    collect_visible_moments,
+    merge_moment_records,
+)
 
 
 @click.command("moments-ui")

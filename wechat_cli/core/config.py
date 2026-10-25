@@ -56,7 +56,7 @@ def _auto_detect_db_dir_windows():
             content = None
             for enc in ("utf-8", "gbk"):
                 try:
-                    with open(ini_file, "r", encoding=enc) as f:
+                    with open(ini_file, encoding=enc) as f:
                         content = f.read(1024).strip()
                     break
                 except UnicodeDecodeError:

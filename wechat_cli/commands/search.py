@@ -6,14 +6,14 @@ from ..core.contacts import get_contact_names
 from ..core.messages import (
     MSG_TYPE_FILTERS,
     MSG_TYPE_NAMES,
+    _candidate_page_size,
+    _page_ranked_entries,
     collect_chat_search,
     parse_time_range,
     resolve_chat_context,
     resolve_chat_contexts,
     search_all_messages,
     validate_pagination,
-    _candidate_page_size,
-    _page_ranked_entries,
 )
 from ..output.formatter import output
 

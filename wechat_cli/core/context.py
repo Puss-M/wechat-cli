@@ -4,7 +4,7 @@ import atexit
 import json
 import os
 
-from .config import load_config, STATE_DIR
+from .config import STATE_DIR, load_config
 from .db_cache import DBCache
 from .key_utils import strip_key_metadata
 from .messages import find_msg_db_keys

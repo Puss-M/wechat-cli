@@ -4,8 +4,8 @@ import struct
 import zlib
 from pathlib import Path
 
-from Crypto.Cipher import AES
 import pytest
+from Crypto.Cipher import AES
 
 from wechat_cli.core.image_cache import (
     ImageDecodeError,
@@ -121,7 +121,7 @@ def test_discover_local_image_key_from_kvcomm(tmp_path, monkeypatch):
     code = 1234567
     account = tmp_path / "wxid_demo0000_1234"
     db_dir = account / "db_storage"
-    key = hashlib.md5(f"{code}wxid_demo0000".encode("utf-8")).hexdigest()[:16].encode("ascii")
+    key = hashlib.md5(f"{code}wxid_demo0000".encode()).hexdigest()[:16].encode("ascii")
     image = b"\xff\xd8\xff\xe0fake-image\xff\xd9"
     moment_id = "moment-test-001"
     media_id = "media-test-001"

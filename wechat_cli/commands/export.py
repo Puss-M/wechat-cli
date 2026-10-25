@@ -1,7 +1,8 @@
 """export 命令 — 导出聊天记录为 markdown 或 txt"""
 
-import click
 from datetime import datetime
+
+import click
 
 from ..core.contacts import get_contact_names
 from ..core.messages import (

@@ -1,9 +1,14 @@
 import json
 
+from click.testing import CliRunner
+
 from wechat_cli.commands.report import report
 from wechat_cli.core.archive import import_moments_json
-from wechat_cli.core.reports import build_monthly_report, build_yearly_report, render_report
-from click.testing import CliRunner
+from wechat_cli.core.reports import (
+    build_monthly_report,
+    build_yearly_report,
+    render_report,
+)
 
 
 def _archive(tmp_path):

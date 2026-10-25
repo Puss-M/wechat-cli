@@ -6,7 +6,7 @@ import sys
 
 import click
 
-from ..core.config import STATE_DIR, CONFIG_FILE, KEYS_FILE, auto_detect_db_dir
+from ..core.config import CONFIG_FILE, KEYS_FILE, STATE_DIR, auto_detect_db_dir
 
 
 @click.command()
@@ -63,7 +63,7 @@ def init(db_dir, force):
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(cfg, f, indent=2, ensure_ascii=False)
 
-    click.echo(f"\n[+] 初始化完成!")
+    click.echo("\n[+] 初始化完成!")
     click.echo(f"    配置: {CONFIG_FILE}")
     click.echo(f"    密钥: {KEYS_FILE}")
     click.echo(f"    提取到 {len(key_map)} 个数据库密钥")

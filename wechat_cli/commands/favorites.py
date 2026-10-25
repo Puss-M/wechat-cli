@@ -2,11 +2,11 @@
 
 import os
 import sqlite3
-from defusedxml import ElementTree as ET  # type: ignore[import-untyped]
 from contextlib import closing
 from datetime import datetime
 
 import click
+from defusedxml import ElementTree as ET  # type: ignore[import-untyped]
 
 from ..core.contacts import get_contact_names
 from ..output.formatter import output

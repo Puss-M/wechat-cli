@@ -4,11 +4,11 @@ import hashlib
 import os
 import re
 import sqlite3
-from defusedxml import ElementTree as ET  # type: ignore[import-untyped]
 from contextlib import closing
 from datetime import datetime
 
 import zstandard as zstd
+from defusedxml import ElementTree as ET  # type: ignore[import-untyped]
 
 from .key_utils import key_path_variants
 
@@ -464,7 +464,7 @@ def validate_pagination(limit, offset=0, limit_max=_QUERY_LIMIT_MAX):
 # ---- 聊天上下文 ----
 
 def resolve_chat_context(chat_name, msg_db_keys, cache, decrypted_dir):
-    from .contacts import resolve_username, get_contact_names
+    from .contacts import get_contact_names, resolve_username
     username = resolve_username(chat_name, cache, decrypted_dir)
     if not username:
         return None

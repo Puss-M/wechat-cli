@@ -1,8 +1,16 @@
 # WeChat CLI
 
+[![CI](https://github.com/Puss-M/wechat-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/Puss-M/wechat-cli/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](pyproject.toml)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+
 A free, local command-line tool for your own WeChat data.
 
 > **v1.0.0.** The public source repository is [Puss-M/wechat-cli](https://github.com/Puss-M/wechat-cli). Source ZIP and wheel downloads are provided; PyPI and npm publication are not included yet.
+
+> [!IMPORTANT]
+> **For personal backup of your own data only.** This tool reads data cached on your own computer for your own WeChat account, for personal record backup and migration. Do not use it to export other people's data, bypass platform restrictions, or for any commercial or ToS-violating purpose. Use at your own risk; the author is not responsible for misuse.
 
 The v1 workflow adds an optional WeChat desktop UI capture path. It runs locally, scrolls an already-open WeChat window, saves page screenshots and text/links exposed by the accessibility tree, then merges them with the local cache. Images, locations, or cards that WeChat does not expose to accessibility are preserved in screenshots instead of being invented as structured fields.
 

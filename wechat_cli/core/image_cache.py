@@ -8,17 +8,16 @@ decoded bytes and decide where to write them.
 from __future__ import annotations
 
 import hashlib
-import re
 import os
+import re
 import struct
 import zlib
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator
 
 # PyCryptodome supplies this namespace; it is declared in pyproject.toml.
 from Crypto.Cipher import AES  # nosec B413
-
 
 V1_SIGNATURE = b"\x07\x08V1\x08\x07"
 V2_SIGNATURE = b"\x07\x08V2\x08\x07"
@@ -368,7 +367,7 @@ def own_sns_cache_names(moment_id: str, media_id: str) -> set[str]:
         return set()
     return {
         hashlib.md5(
-            f"{moment_id}_{media_id}_{variant}".encode("utf-8"),
+            f"{moment_id}_{media_id}_{variant}".encode(),
             usedforsecurity=False,
         ).hexdigest()[2:]
         for variant in ("1", "2")
@@ -490,7 +489,7 @@ def _discover_kvcomm_image_key(db_dir: str | os.PathLike[str], moments) -> tuple
         return None
     for code, _source in _iter_kvcomm_codes():
         key = hashlib.md5(
-            f"{code}{wxid}".encode("utf-8"), usedforsecurity=False
+            f"{code}{wxid}".encode(), usedforsecurity=False
         ).hexdigest()[:16].encode("ascii")
         if any(_probe_v2_key(path, key) for path in samples):
             return key, code & 0xFF
@@ -504,6 +503,7 @@ def discover_local_image_key(db_dir: str | os.PathLike[str], moments) -> tuple[b
         return derived
     try:
         import json
+
         import wx_key  # type: ignore[import-not-found]
     except ImportError as exc:
         raise ImageDecodeError(

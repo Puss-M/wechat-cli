@@ -7,8 +7,6 @@ import subprocess
 import sys
 import tempfile
 
-from .common import collect_db_files, cross_verify_keys, save_results, scan_memory_for_keys
-
 
 def _find_binary():
     """查找对应架构的 C 二进制。"""
@@ -82,7 +80,7 @@ def _resign_wechat():
     if wechat_app is None:
         return False, "未找到 WeChat.app（已搜索 /Applications 和 ~/Applications）"
 
-    print(f"\n[*] 检测到 task_for_pid 权限不足，正在对微信重新签名...")
+    print("\n[*] 检测到 task_for_pid 权限不足，正在对微信重新签名...")
     print(f"    目标: {wechat_app}")
 
     # 提取并合并 entitlements
@@ -149,13 +147,13 @@ def extract_keys(db_dir, output_path, pid=None):
             text=True,
             timeout=120,
         )
-    except subprocess.TimeoutExpired:
-        raise RuntimeError("密钥提取超时（120s）")
-    except PermissionError:
+    except subprocess.TimeoutExpired as e:
+        raise RuntimeError("密钥提取超时（120s）") from e
+    except PermissionError as e:
         raise RuntimeError(
             f"无法执行 {binary}\n"
             "请确保文件有执行权限: chmod +x " + binary
-        )
+        ) from e
 
     # 打印 C 二进制的输出
     if result.stdout:

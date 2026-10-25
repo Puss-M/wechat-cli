@@ -57,18 +57,18 @@ def cli(ctx, config_path):
 
 
 # 注册子命令
-from .commands.contacts import contacts
 from .commands.archive_moments import archive_moments
-from .commands.report import report
-from .commands.memory_web import memory_web
+from .commands.contacts import contacts
 from .commands.export import export
 from .commands.favorites import favorites
 from .commands.history import history
 from .commands.init import init
 from .commands.members import members
+from .commands.memory_web import memory_web
 from .commands.moments import moments
 from .commands.moments_ui import moments_ui
 from .commands.new_messages import new_messages
+from .commands.report import report
 from .commands.search import search
 from .commands.sessions import sessions
 from .commands.stats import stats

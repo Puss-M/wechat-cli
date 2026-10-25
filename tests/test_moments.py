@@ -3,8 +3,8 @@ import sqlite3
 from pathlib import Path
 from unittest.mock import patch
 
-from click.testing import CliRunner
 import pytest
+from click.testing import CliRunner
 
 from wechat_cli.commands.moments import _decode_sns_images, moments
 from wechat_cli.core.image_cache import CacheImage, DecodedImage, own_sns_cache_names

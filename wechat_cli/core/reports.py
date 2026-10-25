@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import html
 import json
+import re
 import sqlite3
 from collections import Counter
 from datetime import datetime, timezone
-from zoneinfo import ZoneInfo
-import re
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 
 class ReportError(ValueError):
@@ -193,8 +193,8 @@ def _coverage_lines(metrics: dict) -> list[str]:
 def build_monthly_report(archive_dir, period: str) -> dict:
     try:
         datetime.strptime(period, "%Y-%m")
-    except ValueError:
-        raise ReportError("月份必须使用 YYYY-MM 格式")
+    except ValueError as e:
+        raise ReportError("月份必须使用 YYYY-MM 格式") from e
     root = Path(archive_dir).expanduser().resolve()
     all_records = _load_records(root)
     records = [record for record in all_records if _period(record) == period]
@@ -259,9 +259,7 @@ def render_report(report: dict, archive_dir, output_path, fmt: str) -> Path:
                 rendered.append(f"<h1>{escaped[2:]}</h1>")
             elif escaped.startswith("## "):
                 rendered.append(f"<h2>{escaped[3:]}</h2>")
-            elif escaped.startswith("- "):
-                rendered.append(f"<p>{escaped}</p>")
-            elif escaped:
+            elif escaped.startswith("- ") or escaped:
                 rendered.append(f"<p>{escaped}</p>")
         body = "\n".join(rendered)
         html_doc = f"<!doctype html><meta charset='utf-8'><title>{html.escape(title)}</title><style>body{{font-family:system-ui,sans-serif;max-width:900px;margin:40px auto;padding:0 20px;line-height:1.7;color:#222}}h1{{line-height:1.2}}a{{color:#06c}}</style><main><div>{body}</div></main>"

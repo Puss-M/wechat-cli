@@ -4,7 +4,6 @@ import os
 import re
 import sqlite3
 
-
 _contact_names = None  # {username: display_name}
 _contact_full = None   # [{username, nick_name, remark}]
 _self_username = None

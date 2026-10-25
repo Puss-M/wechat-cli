@@ -1,8 +1,16 @@
 # WeChat CLI
 
+[![CI](https://github.com/Puss-M/wechat-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/Puss-M/wechat-cli/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](pyproject.toml)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+
 一个免费、在本机运行的微信数据命令行工具。
 
 > **v1.0.3。**公开源码仓库：[Puss-M/wechat-cli](https://github.com/Puss-M/wechat-cli)。当前提供源码 ZIP 和 wheel，暂未发布到 PyPI 或 npm。
+
+> [!IMPORTANT]
+> **仅供个人备份自己产生的数据。** 本工具只在本机读取你自己微信账号缓存的数据，用于个人记录备份与迁移。请勿用于导出他人数据、绕过平台限制、商业用途或其他违反微信服务条款及当地法律法规的用途。使用者自行承担使用风险，作者不对任何滥用后果负责。
 
 v1 增加可选的微信桌面界面采集：它不会上传数据，会在本地滚动已打开的微信窗口，保存每页截图和能从辅助功能树读取的文字/链接，再与本地缓存去重合并。微信没有暴露给辅助功能树的图片、地点或卡片字段，会保留在截图中，不会被伪造为结构化字段。
 

@@ -2,7 +2,13 @@
 
 import click
 
-from ..core.reports import ReportError, build_journey_report, build_monthly_report, build_yearly_report, render_report
+from ..core.reports import (
+    ReportError,
+    build_journey_report,
+    build_monthly_report,
+    build_yearly_report,
+    render_report,
+)
 
 
 @click.command("report")

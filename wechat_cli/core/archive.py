@@ -12,7 +12,6 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-
 SCHEMA_VERSION = "1"
 _BATCH_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$")
 _ASSET_KEYS = {"local_path", "capture_screenshot", "screenshot"}
@@ -130,9 +129,7 @@ def _copy_assets(value, archive_root: Path, asset_records: list[dict], missing: 
             staged_assets[target_name] = staged
         if not target.exists() and staged != target:
             target.parent.mkdir(parents=True, exist_ok=True)
-        if not target.exists() and staged == target:
-            pass
-        elif not target.exists():
+        if not target.exists() and staged == target or not target.exists():
             pass
         relative = str(Path("assets") / target_name).replace("\\", "/")
         asset_records.append({

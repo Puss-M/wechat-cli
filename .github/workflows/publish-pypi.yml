@@ -1,0 +1,47 @@
+name: Publish to PyPI
+
+# 手动触发的 PyPI 发布（OIDC trusted publishing，无需 API token）。
+#
+# 首次使用前需在 PyPI 完成一次性配置：
+# 1. 注册 https://pypi.org 账号
+# 2. PyPI -> Publishing -> Add a new pending publisher:
+#      PyPI project name: wechat-cli
+#      Owner: Puss-M  Repository: wechat-cli
+#      Workflow name: publish-pypi.yml  Environment: pypi
+# 3. 仓库 Settings -> Environments -> New environment: pypi
+# 之后即可手动触发本 workflow 发布。
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: |
+          pip install build
+          python -m build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write  # OIDC trusted publishing
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

@@ -1,8 +1,11 @@
 import sys
 import types
 
-from wechat_cli.core.ui_moments import collect_visible_moments
-from wechat_cli.core.ui_moments import merge_moment_records, parse_visible_moments
+from wechat_cli.core.ui_moments import (
+    collect_visible_moments,
+    merge_moment_records,
+    parse_visible_moments,
+)
 
 
 def test_parse_visible_moments_keeps_text_urls_and_screenshot():

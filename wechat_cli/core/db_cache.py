@@ -5,7 +5,7 @@ import json
 import os
 import tempfile
 
-from .crypto import full_decrypt, decrypt_wal
+from .crypto import decrypt_wal, full_decrypt
 from .key_utils import get_key_info
 
 

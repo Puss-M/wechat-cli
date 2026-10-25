@@ -8,7 +8,6 @@ import hashlib
 import hmac as hmac_mod
 import json
 import os
-import re
 import struct
 
 PAGE_SZ = 4096
@@ -168,7 +167,7 @@ def save_results(db_files, salt_to_dbs, key_map, output_path, print_fn):
             print_fn(f"  MISSING: {rel} (salt={salt_hex})")
 
     if not result:
-        print_fn(f"\n[!] 未提取到任何密钥")
+        print_fn("\n[!] 未提取到任何密钥")
         raise RuntimeError("未能从任何微信进程中提取到密钥")
 
     with open(output_path, 'w', encoding='utf-8') as f:
@@ -177,7 +176,7 @@ def save_results(db_files, salt_to_dbs, key_map, output_path, print_fn):
 
     missing = [rel for rel, path, sz, salt_hex, page1 in db_files if salt_hex not in key_map]
     if missing:
-        print_fn(f"\n未找到密钥的数据库:")
+        print_fn("\n未找到密钥的数据库:")
         for rel in missing:
             print_fn(f"  {rel}")
 
