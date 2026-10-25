@@ -332,6 +332,8 @@ def test_decode_updates_manifest_and_json_image_mapping(tmp_path):
         pass
 
     App.db_dir = str(db_dir)
+    # cfg 缺失会 fallback 到 load_config() 并触发本机微信目录探测，CI 上没有微信
+    App.cfg = {"decoded_image_dir": str(tmp_path / "decoded")}
     with patch(
         "wechat_cli.commands.moments.discover_local_image_key",
         return_value=(b"0123456789abcdef", 0xF9),
